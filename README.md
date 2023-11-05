@@ -12,13 +12,9 @@ Launch Container:
 ```bash
 docker run \
     --shm-size 2gb --gpus all \
-    -v $PWD/data:/data -v $PWD/scripts:/scripts -v $PWD/llm-foundry:/llm-foundry -e HF_HOME="/data" -e WANDB_API_KEY=$wb_key\
+    -v $PWD/data:/data -v $PWD/scripts:/scripts \
+    -e HF_HOME="/data" -e WANDB_API_KEY=$WANDB_API_KEY \
     --network host -it --rm llmf
-```
-
-Install LLM-foundry in the container:
-```bash
-pip install -e /llm-foundry
 ```
 
 Launch Script:
