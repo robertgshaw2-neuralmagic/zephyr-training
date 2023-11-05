@@ -21,3 +21,12 @@ Launch Script:
 ```bash
 composer /scripts/train.py /data/yamls/run0.yaml
 ```
+
+Save to HF:
+```bash
+HUGGING_FACE_HUB_TOKEN=$HF_TOKEN python llm-foundry/scripts/inference/convert_composer_to_hf.py \
+  --composer_path /data/runs/run1/checkpoints/latest-rank0.pt \
+  --hf_output_path mistral-sft-run1-dense \
+  --output_precision bf16 \
+  --hf_repo_for_upload robertgshaw2/mistral-sft-run1-dense
+```

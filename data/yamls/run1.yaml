@@ -76,9 +76,9 @@ global_train_batch_size: 512
 
 # System
 seed: ${global_seed}
-device_eval_batch_size: 32
+device_eval_batch_size: 16
 device_train_batch_size: 32
-device_train_microbatch_size: 32
+device_train_microbatch_size: auto
 precision: amp_bf16
 
 # FSDP
@@ -94,7 +94,7 @@ fsdp_config:
 # Logging
 progress_bar: true
 log_to_console: true
-console_log_interval: 10ba
+console_log_interval: 1ba
 
 callbacks:
   speed_monitor:
