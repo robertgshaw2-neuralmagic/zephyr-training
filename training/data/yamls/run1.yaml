@@ -1,6 +1,6 @@
 run_name: run1
 global_seed: 17
-max_seq_len: 4096
+max_seq_len: 2048
 
 # Model
 model:
@@ -52,8 +52,8 @@ eval_loader:
 
 # Optimization
 scheduler:
-  name: linear_decay_with_warmup
-  t_warmup: 10ba
+  name: cosine_with_warmup
+  t_warmup: 20ba
 
 # Note: You may want to change learning rate, betas, weight decay
 optimizer:
@@ -69,7 +69,7 @@ algorithms:
     clipping_type: norm
     clipping_threshold: 1.0
 
-max_duration: 0.7ep
+max_duration: 1ep
 eval_interval: 1
 eval_first: False
 global_train_batch_size: 512
@@ -77,8 +77,8 @@ global_train_batch_size: 512
 # System
 seed: ${global_seed}
 device_eval_batch_size: 16
-device_train_batch_size: 16
-device_train_microbatch_size: 16
+device_train_batch_size: 32
+device_train_microbatch_size: auto
 precision: amp_bf16
 
 # FSDP
@@ -94,7 +94,7 @@ fsdp_config:
 # Logging
 progress_bar: true
 log_to_console: true
-console_log_interval: 10ba
+console_log_interval: 1ba
 
 callbacks:
   speed_monitor:
@@ -109,6 +109,6 @@ loggers:
     "entity": "rshaw"
   }
 
-save_interval: 200ba
-save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
+save_interval: 100ba
+save_num_checkpoints_to_keep: 3  # Important, this cleans up checkpoints saved to DISK
 save_folder: data/runs/{run_name}/checkpoints
