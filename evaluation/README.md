@@ -1,9 +1,12 @@
+## MT-Bench Evaluation
+
 Install:
 
 ```bash
 git clone https://github.com/rsnm2/FastChat.git
 cd FastChat
-pip install -e ".[model_worker,llm_judge]" pandas
+pip install torch=2.0.1 pandas
+pip install -e ".[model_worker,llm_judge]"
 cd fastchat/llm_judge
 ```
 
@@ -52,4 +55,13 @@ dolly-v2-12b                 3.275000
 fastchat-t5-3b               3.040625
 stablelm-tuned-alpha-7b      2.753125
 llama-13b                    2.606250
+```
+
+
+Generate answers for a new model:
+```bash
+python gen_model_answer.py --model-path robertgshaw2/mistral-sft-run1-dense --model-id mistral-sft-run1-dense
+python gen_model_answer.py --model-path HuggingFaceH4/mistral-7b-sft-beta --model-id mistral-sft-beta-dense
+python gen_model_answer.py --model-path HuggingFaceH4/zephyr-7b-beta --model-id zephry-beta-dense
+python gen_model_answer.py --model-path ~/zephyr-training/pruning/data/mistral-sft-beta-50sparse-fp16-one-shot-v0  --model-id mistral-sft-beta-50sparse-fp16-one-shot-v0
 ```
