@@ -65,3 +65,12 @@ python gen_model_answer.py --model-path HuggingFaceH4/mistral-7b-sft-beta --mode
 python gen_model_answer.py --model-path HuggingFaceH4/zephyr-7b-beta --model-id zephry-beta-dense
 python gen_model_answer.py --model-path ~/zephyr-training/pruning/data/mistral-sft-beta-50sparse-fp16-one-shot-v0  --model-id mistral-sft-beta-50sparse-fp16-one-shot-v0
 ```
+
+Evaluate the generated answers:
+
+```bash
+python3 gen_judgment.py \
+    --mode single \
+    --model-list zephyr-50sparse-fp16-one-shot-v0 zephyr-beta-dense mistral-sft-beta-dense gpt-3.5-turbo \
+    --parallel 1
+```
