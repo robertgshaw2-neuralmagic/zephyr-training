@@ -3,12 +3,14 @@ from composer.core.data_spec import DataSpec
 from composer.utils import dist
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase, AutoTokenizer
 from llmfoundry.data.finetuning.tasks import dataset_constructor
 from llmfoundry.data.text_data import get_tokens_per_batch_func
 from trl import DataCollatorForCompletionOnlyLM
 from functools import partial
 import os
+
+NUM_SAMPLES = 10000
 
 system_prompt = {
     "content": "You are a friendly chatbot",
@@ -22,7 +24,8 @@ def add_system_prompt(batch):
 
     return {"messages_with_sys_prompt": updated_messages}
 
-def apply_chat_template(tokenizer, messages_col, element):
+def apply_chat_template(chat_template_name, messages_col, element):
+    tokenizer = AutoTokenizer.from_pretrained(chat_template_name)
     return tokenizer.apply_chat_template(element[messages_col], tokenize=False)
     
     # strs = []
@@ -40,15 +43,16 @@ def build_from_hf(
     split = cfg.split.replace('-', '_')
     dataset = hf_datasets.load_dataset(dataset_name, split=split)
 
-    dataset = dataset.map(
+    # dataset = dataset.map(
+    dataset=dataset.select(range(NUM_SAMPLES)).map(
         add_system_prompt,
         batched=True,
-        num_proc=1,
+        num_proc=32,
         batch_size=32,
     )
 
-    chat_formatting_func = partial(apply_chat_template, tokenizer, "messages_with_sys_prompt")
-
+    chat_formatting_func = partial(apply_chat_template, cfg.chat_template_name, "messages_with_sys_prompt")
+    
     def tokenize(element):
         outputs = tokenizer(
             chat_formatting_func(element),
@@ -65,7 +69,7 @@ def build_from_hf(
         tokenize,
         batched=False,
         remove_columns=dataset.column_names,
-        num_proc=1,
+        num_proc=32,
     )
 
     return tokenized_dataset
@@ -77,7 +81,7 @@ def build_chat_dataloader(
 
     # Use EOS as the pad token if none exists
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token = tokenizer.bos_token
 
     dataset = build_from_hf(
         cfg.dataset,
