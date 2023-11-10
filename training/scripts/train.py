@@ -1,6 +1,6 @@
 from chat_dataloader import build_chat_dataloader
 from packed_chat_dataloader import build_packed_chat_dataloader
-from sparse_utils import attach_masks, MaskedPrunedWeights, MeasureSparsityCallback
+from sparse_utils import attach_masks, MaskPrunedWeights, MeasureSparsityCallback
 
 import copy
 import gc
@@ -559,6 +559,14 @@ def main(cfg: DictConfig) -> Trainer:
         build_algorithm(str(name), algorithm_cfg)
         for name, algorithm_cfg in algorithm_configs.items()
     ] if algorithm_configs else None
+    
+################################################################################################################
+    if sparse_finetuning:
+        if algorithms is None:
+            algorithms = [MaskPrunedWeights()]
+        else:
+            algorithms.append(MaskPrunedWeights())
+################################################################################################################
 
     # Dataloaders
     print('Building train loader...')

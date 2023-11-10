@@ -13,7 +13,7 @@ Launch Container:
 docker run \
     --shm-size 2gb --gpus all \
     -v $PWD/data:/data -v $PWD/scripts:/scripts \
-    -e HF_HOME="/data" -e WANDB_API_KEY=$WANDB_API_KEY \
+    -e HF_TOKEN=$HF_TOKEN -e HF_HOME="/data" -e WANDB_API_KEY=$WANDB_API_KEY \
     --network host -it --rm llmf
 ```
 

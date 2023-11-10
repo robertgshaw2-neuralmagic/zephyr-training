@@ -1,13 +1,14 @@
 import torch
 from composer.core import Event, Algorithm
-from composer import Callback
+from composer import Callback, State, Logger
 
 def print_layer_sparsity(model: torch.nn.Module) -> None:
     for name, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
+            mask = torch.where(module.weight == 0, torch.tensor(0, dtype=torch.uint8), torch.tensor(1, dtype=torch.uint8))
             print(f"[Layer {name} sparsity = {torch.sum(mask == 0)/mask.numel()}]")
 
-class MeasureSparsityCallback(CallBack):
+class MeasureSparsityCallback(Callback):
     def batch_start(self, state: State, logger: Logger):
         assert state.model.training == False
         print_layer_sparsity(state.model)

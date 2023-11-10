@@ -11,12 +11,14 @@ model:
   pretrained: true
   use_flash_attention_2: true
   master_weights_dtype: bf16
+  use_auth_token: true
 
 # Tokenizer
 tokenizer:
   name: robertgshaw2/mistral-sft-50sparse-fp16-v0
   kwargs:
     model_max_length: ${max_seq_len}
+  use_auth_token: true
 
 # Dataloaders
 train_loader:
