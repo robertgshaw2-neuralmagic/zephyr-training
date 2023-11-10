@@ -550,8 +550,8 @@ def main(cfg: DictConfig) -> Trainer:
     ] if callback_configs else []
     
 ################################################################################################################
-    if sparse_finetuning:
-        callbacks.append(MeasureSparsityCallback())
+    # if sparse_finetuning:
+    #     callbacks.append(MeasureSparsityCallback())
 ################################################################################################################
 
     # Algorithms

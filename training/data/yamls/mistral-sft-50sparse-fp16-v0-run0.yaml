@@ -6,7 +6,6 @@ sparse_finetuning: true
 # Model
 model:
   name: hf_causal_lm
-  init_device: mixed
   pretrained_model_name_or_path: robertgshaw2/mistral-sft-50sparse-fp16-v0
   pretrained: true
   use_flash_attention_2: true

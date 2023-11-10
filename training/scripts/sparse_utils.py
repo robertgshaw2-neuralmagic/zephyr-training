@@ -10,8 +10,8 @@ def print_layer_sparsity(model: torch.nn.Module) -> None:
 
 class MeasureSparsityCallback(Callback):
     def batch_start(self, state: State, logger: Logger):
-        assert state.model.training == False
-        print_layer_sparsity(state.model)
+        with torch.no_grad():
+            print_layer_sparsity(state.model)
 
 class MaskPrunedWeights(Algorithm):
     def match(self, event, state):
