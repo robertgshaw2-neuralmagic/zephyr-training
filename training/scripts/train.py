@@ -1,4 +1,5 @@
 from chat_dataloader import build_chat_dataloader
+from packed_chat_dataloader import build_packed_chat_dataloader
 
 import copy
 import gc
@@ -190,13 +191,20 @@ def build_dataloader(cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
             tokenizer,
             device_batch_size,
         )
-# adds chat dataloader
+
 ######################################################################################################################################################
+# adds chat dataloader
     elif cfg.name == 'chat':
         return build_chat_dataloader(
             cfg,
             tokenizer,
             device_batch_size,
+        )
+    elif cfg.name == "packed_chat":
+        return build_packed_chat_dataloader(
+            cfg,
+            tokenizer,
+            device_batch_size
         )
 ######################################################################################################################################################
     else:
@@ -474,6 +482,14 @@ def main(cfg: DictConfig) -> Trainer:
     tokenizer_name = tokenizer_config['name']
     tokenizer_kwargs = tokenizer_config.get('kwargs', {})
     tokenizer = build_tokenizer(tokenizer_name, tokenizer_kwargs)
+    
+######################################################################################################################################################    
+    # set chat template
+    chat_tokenizer_name = tokenizer_config.get('chat_template_tokenizer', None)
+    if chat_tokenizer_name is not None:
+        chat_tokenizer = AutoTokenizer.from_pretrained(chat_tokenizer_name)
+        tokenizer.chat_template = chat_tokenizer.chat_template
+######################################################################################################################################################
 
     # Scheduler
     scheduler_name: str = scheduler_config.pop('name')
