@@ -52,10 +52,11 @@ optimizer:
   - 0.95
   weight_decay: 0.0
 
-algorithms:
-  gradient_clipping:
-    clipping_type: norm
-    clipping_threshold: 1.0
+# we can't use gradient clipping for sparse training runs because we don't have a way to mask gradients of pruned weights, and thus the global gradient norm incorrect
+# algorithms:
+#   gradient_clipping:
+#     clipping_type: norm
+#     clipping_threshold: 1.0
 
 max_duration: 1ep
 eval_interval: 1
