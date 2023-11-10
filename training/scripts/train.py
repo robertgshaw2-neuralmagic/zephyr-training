@@ -1,5 +1,6 @@
 from chat_dataloader import build_chat_dataloader
 from packed_chat_dataloader import build_packed_chat_dataloader
+from sparse_utils import attach_masks, MaskedPrunedWeights, MeasureSparsityCallback
 
 import copy
 import gc
@@ -169,7 +170,6 @@ def print_trainable_parameters(model: torch.nn.Module) -> None:
     print(
         f'trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}'
     )
-
 
 def build_dataloader(cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
                      device_batch_size: int):
@@ -426,6 +426,11 @@ def main(cfg: DictConfig) -> Trainer:
                                                           'compile_config',
                                                           must_exist=False,
                                                           default_value=None)
+    
+#########################################################################################################
+    sparse_finetuning: bool = pop_config(cfg, 'sparse_finetuning', must_exist=False, default_value=False)
+#########################################################################################################
+
     # Enable autoresume from model checkpoints if possible
     autoresume_default: bool = False
     if logged_cfg.get('run_name', None) is not None \
@@ -543,6 +548,11 @@ def main(cfg: DictConfig) -> Trainer:
         build_callback(str(name), callback_cfg)
         for name, callback_cfg in callback_configs.items()
     ] if callback_configs else []
+    
+################################################################################################################
+    if sparse_finetuning:
+        callbacks.append(MeasureSparsityCallback())
+################################################################################################################
 
     # Algorithms
     algorithms = [
@@ -607,6 +617,20 @@ def main(cfg: DictConfig) -> Trainer:
             model = model.to(dtype=torch.bfloat16)
         elif model_config.get('master_weights_dtype') in ('f16', 'float16'):
             model = model.to(dtype=torch.float16)
+
+################################################################################################################################################################
+    # attach sparsity mask to the pruned model
+    if sparse_finetuning:
+        print("\n\n----------------------------------------------------------------------------------------------------")
+        print("ATTACHING SPARSITY MASKS")
+        print("----------------------------------------------------------------------------------------------------")
+
+        attach_masks(model, torch.nn.Linear)
+    else:
+        print("\n\n----------------------------------------------------------------------------------------------------")
+        print("SPARSITY MASKS NOT ATTACHED")
+        print("----------------------------------------------------------------------------------------------------")
+################################################################################################################################################################
 
     # Log number of parameters
     n_params = sum(p.numel() for p in model.parameters())
