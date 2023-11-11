@@ -611,14 +611,14 @@ def main(cfg: DictConfig) -> Trainer:
             print_trainable_parameters(model)  # should not be 100%
         else:  # standard model
             # initialize teacher model
-           if knowledge_distillation_config is not None:
+            if knowledge_distillation_config is not None:
                 print(f"[Debugging] Knowledge Distillation config = {knowledge_distillation_config}")
                 teacher_config = copy.deepcopy(model_config)
                 teacher_config['pretrained_model_name_or_path'] = knowledge_distillation_config.teacher_name_or_path
                 teacher = build_composer_model(teacher_config, tokenizer)
                 teacher.eval()
                 teacher = teacher.to(torch.bfloat16)
-                
+
             model = build_composer_model(model_config, tokenizer)
 
         if model_config.get('master_weights_dtype') in ('bf16', 'bfloat16'):
