@@ -133,7 +133,8 @@ class KnowledgeDistillation(Algorithm):
                         useful_tokens = state.batch['attention_mask'] == 1
                         student_states = state.outputs.hidden_states[i][useful_tokens]
                         teacher_states = teacher_outputs.hidden_states[i][useful_tokens]
-
+                
+                layerwise_losses.append((student_states - teacher_states).pow(2).mean() / (teacher_states.pow(2).mean() + torch.finfo(torch.bfloat16).eps))
                 squarehead_loss = self.hardness_squarehead * sum(layerwise_losses)
 ########################################################################################################################################################################################################################
 
