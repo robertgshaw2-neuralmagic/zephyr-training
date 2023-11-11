@@ -610,7 +610,9 @@ def main(cfg: DictConfig) -> Trainer:
                 tokenizer)
             print_trainable_parameters(model)  # should not be 100%
         else:  # standard model
+
             # initialize teacher model
+################################################################################################################################################################
             if knowledge_distillation_config is not None:
                 print(f"[Debugging] Knowledge Distillation config = {knowledge_distillation_config}")
                 teacher_config = copy.deepcopy(model_config)
@@ -618,7 +620,7 @@ def main(cfg: DictConfig) -> Trainer:
                 teacher = build_composer_model(teacher_config, tokenizer)
                 teacher.eval()
                 teacher = teacher.to(torch.bfloat16)
-
+################################################################################################################################################################
             model = build_composer_model(model_config, tokenizer)
 
         if model_config.get('master_weights_dtype') in ('bf16', 'bfloat16'):
@@ -643,10 +645,10 @@ def main(cfg: DictConfig) -> Trainer:
             algorithms.append(
                 KnowledgeDistillation(
                     teacher, 
-                    cfg.knowledge_distillation.temperature, 
-                    cfg.knowledge_distillation.hardness_ce, 
-                    cfg.knowledge_distillation.hardness_kldiv, 
-                    cfg.knowledge_distillation.hardness_squarehead
+                    knowledge_distillation_config.temperature, 
+                    knowledge_distillation_config.hardness_ce, 
+                    knowledge_distillation_config.hardness_kldiv, 
+                    knowledge_distillation_config.hardness_squarehead
                 )
             )
 
