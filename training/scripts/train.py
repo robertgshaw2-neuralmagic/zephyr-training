@@ -1,6 +1,6 @@
 from chat_dataloader import build_chat_dataloader
 from packed_chat_dataloader import build_packed_chat_dataloader
-from sparse_utils import attach_masks, MaskPrunedWeights, MeasureSparsityCallback
+from sparse_utils import attach_masks, MaskPrunedWeights, PrintSparsityCallback, KnowledgeDistillation
 
 import copy
 import gc
@@ -429,6 +429,10 @@ def main(cfg: DictConfig) -> Trainer:
     
 #########################################################################################################
     sparse_finetuning: bool = pop_config(cfg, 'sparse_finetuning', must_exist=False, default_value=False)
+    knowledge_distillation_config: Optional[Dict[str, Any]] = pop_config(cfg, 
+                                                                        'knowledge_distillation',
+                                                                        must_exist=False,
+                                                                        default_value=None)
 #########################################################################################################
 
     # Enable autoresume from model checkpoints if possible
@@ -548,25 +552,12 @@ def main(cfg: DictConfig) -> Trainer:
         build_callback(str(name), callback_cfg)
         for name, callback_cfg in callback_configs.items()
     ] if callback_configs else []
-    
-################################################################################################################
-    # if sparse_finetuning:
-    #     callbacks.append(MeasureSparsityCallback())
-################################################################################################################
 
     # Algorithms
     algorithms = [
         build_algorithm(str(name), algorithm_cfg)
         for name, algorithm_cfg in algorithm_configs.items()
     ] if algorithm_configs else None
-    
-################################################################################################################
-    if sparse_finetuning:
-        if algorithms is None:
-            algorithms = [MaskPrunedWeights()]
-        else:
-            algorithms.append(MaskPrunedWeights())
-################################################################################################################
 
     # Dataloaders
     print('Building train loader...')
@@ -627,17 +618,38 @@ def main(cfg: DictConfig) -> Trainer:
             model = model.to(dtype=torch.float16)
 
 ################################################################################################################################################################
-    # attach sparsity mask to the pruned model
-    if sparse_finetuning:
-        print("\n\n----------------------------------------------------------------------------------------------------")
-        print("ATTACHING SPARSITY MASKS")
-        print("----------------------------------------------------------------------------------------------------")
+        # initialize teacher model
+        if knowledge_distillation_config is not None:
+            print(f"[Debugging] Knowledge Distillation config = {knowledge_distillation_config}")
+            teacher_config = copy.deepcopy(model_config)
+            teacher_config['pretrained_model_name_or_path'] = cfg.knowledge_distillation.teacher_name_or_path
+            teacher = build_composer_model(teacher_config, tokenizer)
+            teacher.eval()
 
+    if sparse_finetuning:
+        # 1) Attach Sparsity Masks
         attach_masks(model, torch.nn.Linear)
-    else:
-        print("\n\n----------------------------------------------------------------------------------------------------")
-        print("SPARSITY MASKS NOT ATTACHED")
-        print("----------------------------------------------------------------------------------------------------")
+
+        # 2) Algorithms: add Constant Pruning Modifier
+        if algorithms is None:
+            algorithms = [MaskPrunedWeights()]
+        else:
+            algorithms.append(MaskPrunedWeights())
+
+        # 3) Algorithms: add KD algorithm
+        if knowledge_distillation_config is not None:
+            algorithms.append(
+                KnowledgeDistillation(
+                    teacher, 
+                    cfg.knowledge_distillation.temperature, 
+                    cfg.knowledge_distillation.hardness_ce, 
+                    cfg.knowledge_distillation.hardness_kldiv, 
+                    cfg.knowledge_distillation.hardness_squarehead
+                )
+            )
+
+        # 4) Callbacks: add print sparsity callback
+        callbacks.append(PrintSparsityCallback())
 ################################################################################################################################################################
 
     # Log number of parameters
