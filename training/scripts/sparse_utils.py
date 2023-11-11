@@ -122,12 +122,20 @@ class KnowledgeDistillation(Algorithm):
             if self.hardness_squarehead > 0:
                 layerwise_losses = []
                 for i in range(1, len(state.outputs.hidden_states)):
-                    useful_tokens = state.batch['attention_mask'] == 1
-                    student_states = state.outputs.hidden_states[i][useful_tokens]
-                    teacher_states = teacher_outputs.hidden_states[i][useful_tokens]
-                    layerwise_losses.append((student_states - teacher_states).pow(2).mean() / (teacher_states.pow(2).mean() + torch.finfo(torch.bfloat16).eps))
+
+########################################################################################################################################################################################################################
+                    # if using a dataloader without an attention_mask (e.g. packing dataset), all tokens are useful
+                    if "attention_mask" not in state.batch:
+                        student_states = state.outputs.hidden_states[i]
+                        teacher_states = teacher_outputs.hidden_states[i]
+                    # if using a dataloader with an attention_mask (e.g. seq2seq), select only those with attn_mask=1
+                    else:
+                        useful_tokens = state.batch['attention_mask'] == 1
+                        student_states = state.outputs.hidden_states[i][useful_tokens]
+                        teacher_states = teacher_outputs.hidden_states[i][useful_tokens]
 
                 squarehead_loss = self.hardness_squarehead * sum(layerwise_losses)
+########################################################################################################################################################################################################################
 
             to_log = {
                 "losses/ce": self.hardness_ce * state.loss.item(),
