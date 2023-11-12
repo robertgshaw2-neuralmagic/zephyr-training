@@ -1,6 +1,6 @@
-from chat_dataloader import build_chat_dataloader
-from packed_chat_dataloader import build_packed_chat_dataloader
-from sparse_utils import attach_masks, MaskPrunedWeights, PrintSparsityCallback, KnowledgeDistillation
+from dataloaders.chat_dataloader import build_chat_dataloader
+from dataloaders.packed_chat_dataloader import build_packed_chat_dataloader
+from utils.sparsity import attach_masks, MaskPrunedWeights, PrintSparsityCallback, KnowledgeDistillation
 
 import copy
 import gc
