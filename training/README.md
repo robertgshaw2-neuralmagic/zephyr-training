@@ -24,9 +24,9 @@ composer /scripts/train.py /data/yamls/run2.yaml
 
 Save to HF:
 ```bash
-HUGGING_FACE_HUB_TOKEN=$HF_TOKEN python /llm-foundry/scripts/inference/convert_composer_to_hf.py \
-  --composer_path /data/runs/run2/checkpoints/latest-rank0.pt \
-  --hf_output_path mistral-sft-run2-10k-samples \
+HUGGING_FACE_HUB_TOKEN=$HF_TOKEN_WRITE python /llm-foundry/scripts/inference/convert_composer_to_hf.py \
+  --composer_path /data/runs/mistral-sft-50sparse-fp16-v0-run1/checkpoints/latest-rank0.pt \
+  --hf_output_path mistral-sft-50sparse-run1 \
   --output_precision bf16 \
-  --hf_repo_for_upload robertgshaw2/mistral-sft-run2-10k-samples
+  --hf_repo_for_upload robertgshaw2/mistral-sft-50sparse-run1
 ```
