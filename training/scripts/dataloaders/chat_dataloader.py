@@ -10,7 +10,7 @@ from trl import DataCollatorForCompletionOnlyLM
 from functools import partial
 import os
 
-NUM_SAMPLES = 10000
+NUM_SAMPLES = 2000
 
 system_prompt = {
     "content": "You are a friendly chatbot",
@@ -111,6 +111,12 @@ def build_chat_dataloader(
         persistent_workers=cfg.get('persistent_workers', True),
         timeout=cfg.get('timeout', 0),
     )
+
+    print("\n\n------------------------------------------------------------------")
+    print(f"dataloader_batch_size = {dataloader_batch_size}")
+    print(f"len(dataset) = {len(dataset)}")
+    print(f"len(dl) = {len(dl)}")
+    print("------------------------------------------------------------------\n\n")
 
     token_counting_func = get_tokens_per_batch_func(
         pad_token_id=tokenizer.pad_token_id)

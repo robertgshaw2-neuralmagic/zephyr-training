@@ -1,5 +1,5 @@
 from dataloaders.chat_dataloader import build_chat_dataloader
-from dataloaders.packed_chat_dataloader import build_packed_chat_dataloader
+from dataloaders.chat_text_dataloader import build_chat_text_dataloader
 from utils.sparsity import attach_masks, MaskPrunedWeights, PrintSparsityCallback, KnowledgeDistillation
 
 import copy
@@ -200,8 +200,8 @@ def build_dataloader(cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
             tokenizer,
             device_batch_size,
         )
-    elif cfg.name == "packed_chat":
-        return build_packed_chat_dataloader(
+    elif cfg.name == "chat_text":
+        return build_chat_text_dataloader(
             cfg,
             tokenizer,
             device_batch_size
@@ -566,6 +566,8 @@ def main(cfg: DictConfig) -> Trainer:
         tokenizer,
         device_train_batch_size,
     )
+
+    print(len(train_loader.dataloader))
 
     if mosaicml_logger is not None:
         mosaicml_logger.log_metrics({'data_validated': time.time()})
