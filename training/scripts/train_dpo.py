@@ -1,6 +1,6 @@
-from
-from sparse_utils import attach_masks, MaskPrunedWeights
-
+from dataloaders.dpo_dataloader import build_dpo_dataloader
+from utils.sparsity import attach_masks, MaskPrunedWeights
+from utils.drop import ComposerHFCausalLMWithDPO, DPO
 
 import copy
 import gc
@@ -123,11 +123,19 @@ def build_composer_model(model_cfg: DictConfig,
     warnings.filterwarnings(
         action='ignore',
         message='Torchmetrics v0.9 introduced a new argument class property')
+
+######################################################################################################################################################    
+    # loads DPO model
+    if model_cfg.name == "hf_dpo":
+        return ComposerHFCausalLMWithDPO(model_cfg, tokenizer)
+    else:
+        raise ValueError("DPO training requires using a DPO model")
+######################################################################################################################################################
+    
     if model_cfg.name not in COMPOSER_MODEL_REGISTRY:
         raise ValueError(
             f'Not sure how to build model with name={model_cfg.name}')
     return COMPOSER_MODEL_REGISTRY[model_cfg.name](model_cfg, tokenizer)
-
 
 def build_composer_peft_model(
         pretrained_model_name_or_path: str, lora_args: Dict[str, Any],
@@ -173,43 +181,17 @@ def print_trainable_parameters(model: torch.nn.Module) -> None:
 
 def build_dataloader(cfg: DictConfig, tokenizer: PreTrainedTokenizerBase,
                      device_batch_size: int):
-    if cfg.name == 'text':
-        return build_text_dataloader(
-            cfg,
-            tokenizer,
-            device_batch_size,
-        )
-    elif cfg.name == 'text_denoising':
-        return build_text_denoising_dataloader(
-            cfg,
-            tokenizer,
-            device_batch_size,
-        )
-    elif cfg.name == 'finetuning':
-        return build_finetuning_dataloader(
-            cfg,
-            tokenizer,
-            device_batch_size,
-        )
 
-######################################################################################################################################################
-# adds chat dataloader
-    elif cfg.name == 'chat':
-        return build_chat_dataloader(
+######################################################################################################################################################    
+    if cfg.name == "dpo":
+        return build_dpo_dataloader(
             cfg,
             tokenizer,
             device_batch_size,
         )
-    elif cfg.name == "packed_chat":
-        return build_packed_chat_dataloader(
-            cfg,
-            tokenizer,
-            device_batch_size
-        )
-######################################################################################################################################################
     else:
-        raise ValueError(f'Not sure how to build dataloader with config: {cfg}')
-
+        raise ValueError(f'Must pass a dpo dataset')
+######################################################################################################################################################    
 
 def main(cfg: DictConfig) -> Trainer:
     # Filter deprecation warning from torch internal usage
@@ -428,11 +410,8 @@ def main(cfg: DictConfig) -> Trainer:
                                                           default_value=None)
     
 #########################################################################################################
+    ref_model_config: DictConfig = pop_config(cfg, 'ref_model', must_exist=True)
     sparse_finetuning: bool = pop_config(cfg, 'sparse_finetuning', must_exist=False, default_value=False)
-    knowledge_distillation_config: Optional[Dict[str, Any]] = pop_config(cfg, 
-                                                                        'knowledge_distillation',
-                                                                        must_exist=False,
-                                                                        default_value=None)
 #########################################################################################################
 
     # Enable autoresume from model checkpoints if possible
@@ -492,14 +471,6 @@ def main(cfg: DictConfig) -> Trainer:
     tokenizer_kwargs = tokenizer_config.get('kwargs', {})
     tokenizer = build_tokenizer(tokenizer_name, tokenizer_kwargs)
     
-######################################################################################################################################################    
-    # set chat template
-    chat_tokenizer_name = tokenizer_config.get('chat_template_tokenizer', None)
-    if chat_tokenizer_name is not None:
-        chat_tokenizer = AutoTokenizer.from_pretrained(chat_tokenizer_name)
-        tokenizer.chat_template = chat_tokenizer.chat_template
-######################################################################################################################################################
-
     # Scheduler
     scheduler_name: str = scheduler_config.pop('name')
     scheduler = build_scheduler(scheduler_name, scheduler_config)
@@ -611,49 +582,22 @@ def main(cfg: DictConfig) -> Trainer:
             print_trainable_parameters(model)  # should not be 100%
         else:  # standard model
 
-            # initialize teacher model
-################################################################################################################################################################
-            if knowledge_distillation_config is not None:
-                print(f"[Debugging] Knowledge Distillation config = {knowledge_distillation_config}")
-                teacher_config = copy.deepcopy(model_config)
-                teacher_config['pretrained_model_name_or_path'] = knowledge_distillation_config.teacher_name_or_path
-                teacher = build_composer_model(teacher_config, tokenizer)
-                teacher.eval()
-                teacher = teacher.to(torch.bfloat16)
 ################################################################################################################################################################
             model = build_composer_model(model_config, tokenizer)
-
-        if model_config.get('master_weights_dtype') in ('bf16', 'bfloat16'):
+            ref_model = build_composer_model(ref_model_config, tokenizer)
             model = model.to(dtype=torch.bfloat16)
-        elif model_config.get('master_weights_dtype') in ('f16', 'float16'):
-            model = model.to(dtype=torch.float16)
-
-################################################################################################################################################################
-        
+            ref_model = ref_model.to(dtype=torch.bfloat16)
+    
+    if algorithms is None:
+        algorithms = [DPO(ref_model,tokenizer)]
+    else:
+        algorithms.append(DPO(ref_model,tokenizer))
+    
+    # if sparse finetuning apply sparsity mask
     if sparse_finetuning:
-        # 1) Attach Sparsity Masks
         attach_masks(model, torch.nn.Linear)
+        algorithms.append(MaskPrunedWeights())
 
-        # 2) Algorithms: add Constant Pruning Modifier
-        if algorithms is None:
-            algorithms = [MaskPrunedWeights()]
-        else:
-            algorithms.append(MaskPrunedWeights())
-
-        # 3) Algorithms: add KD algorithm
-        if knowledge_distillation_config is not None:
-            algorithms.append(
-                KnowledgeDistillation(
-                    teacher, 
-                    knowledge_distillation_config.temperature, 
-                    knowledge_distillation_config.hardness_ce, 
-                    knowledge_distillation_config.hardness_kldiv, 
-                    knowledge_distillation_config.hardness_squarehead
-                )
-            )
-
-        # 4) Callbacks: add print sparsity callback
-        callbacks.append(PrintSparsityCallback())
 ################################################################################################################################################################
 
     # Log number of parameters
