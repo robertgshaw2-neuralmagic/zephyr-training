@@ -11,7 +11,7 @@ parser.add_argument("--recipe-path", type=str, required=True)
 parser.add_argument("--save-path", type=str, required=True)
 
 DATASET_ID = "HuggingFaceH4/ultrachat_200k"
-SEQUENCE_LENGTH = 1024
+SEQUENCE_LENGTH = 512
 NSAMPLES = 512
 
 class ChatDataset(TransformersDataset):
@@ -70,7 +70,7 @@ def run_obcq(model_path, recipe_path, save_path):
     print("\n---------- Loading Model ----------")
     model = AutoModelForCausalLM.from_pretrained(
         model_path, 
-        torch_dtype=torch.bfloat16)
+        torch_dtype=torch.float16)
 
     print("\n---------- Running Pruning ----------")
     session_manager.create_session()
