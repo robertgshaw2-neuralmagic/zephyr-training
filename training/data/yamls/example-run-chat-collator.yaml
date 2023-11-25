@@ -1,6 +1,6 @@
 run_name: example-chat-collator
 global_seed: 17
-max_seq_len: 1024
+max_seq_len: 2048
 
 # Model
 model:
