@@ -1,0 +1,98 @@
+run_name: tinyllama-sft-run0.yaml
+global_seed: 17
+max_seq_len: 2048
+sparse_finetuning: false
+
+# Model
+model:
+  name: hf_causal_lm
+  pretrained_model_name_or_path: TinyLlama/TinyLlama-1.1B-intermediate-step-955k-token-2T
+  pretrained: true
+  use_flash_attention_2: false
+  master_weights_dtype: bf16
+
+# Tokenizer
+tokenizer:
+  name: TinyLlama/TinyLlama-1.1B-intermediate-step-955k-token-2T
+  kwargs:
+    model_max_length: ${max_seq_len}
+  chat_template_tokenizer: HuggingFaceH4/mistral-7b-sft-beta
+
+# Dataloaders
+train_loader:
+  name: chat_text
+  dataset:
+    hf_name: HuggingFaceH4/ultrachat_200k
+    split: train_sft
+    max_seq_len: ${max_seq_len}
+    num_samples: 10000
+    shuffle: true
+  drop_last: true
+  num_workers: 8
+  pin_memory: false
+  prefetch_factor: 2
+  persistent_workers: true
+  timeout: 0
+
+# Optimization
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: 5ba
+
+# Note: You may want to change learning rate, betas, weight decay
+optimizer:
+  name: decoupled_adamw
+  lr: 2.0e-5
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.0
+
+algorithms:
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+
+max_duration: 1ep
+eval_interval: 1
+eval_first: False
+global_train_batch_size: 128
+
+# System
+seed: ${global_seed}
+device_eval_batch_size: 32
+device_train_batch_size: 32
+device_train_microbatch_size: auto
+precision: amp_bf16
+
+# FSDP
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: PURE
+  activation_checkpointing: true
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+  verbose: false
+
+# Logging
+progress_bar: true
+log_to_console: true
+console_log_interval: 1ba
+
+callbacks:
+  speed_monitor:
+    window_size: 10
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+
+loggers:
+  wandb: {
+    "project": "zephyr-training",
+    "entity": "rshaw"
+  }
+
+save_interval: 100ba
+save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
+save_folder: data/runs/{run_name}/checkpoints
