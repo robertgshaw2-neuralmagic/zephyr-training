@@ -81,17 +81,11 @@ class DPO(Algorithm):
             )
 
             loss = losses.mean()
-            reward_accuracies = (chosen_rewards > rejected_rewards).float()
+
 
             metrics = {}
-            metrics[f"dpo/rewards/chosen"] = chosen_rewards.cpu().mean()
-            metrics[f"dpo/rewards/rejected"] = rejected_rewards.cpu().mean()
-            metrics[f"dpo/rewards/accuracies"] = reward_accuracies.cpu().mean()
-            metrics[f"dpo/rewards/margins"] = (chosen_rewards - rejected_rewards).cpu().mean()
             metrics[f"dpo/logps/rejected"] = policy_rejected_logps.detach().cpu().mean()
             metrics[f"dpo/logps/chosen"] = policy_chosen_logps.detach().cpu().mean()
-            metrics[f"dpo/logits/rejected"] = policy_rejected_logits.detach().cpu().mean()
-            metrics[f"dpo/logits/chosen"] = policy_chosen_logits.detach().cpu().mean()
             logger.log_metrics(metrics)
 
             state.loss += loss

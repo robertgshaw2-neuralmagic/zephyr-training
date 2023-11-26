@@ -1,7 +1,8 @@
 import re, random
+from typing import Optional, Union, Dict
 
 from torch.utils.data import DataLoader
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase, PreTrainedModel
 from trl.trainer.utils import DPODataCollatorWithPadding
 import datasets as hf_datasets
 

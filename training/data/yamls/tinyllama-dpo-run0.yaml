@@ -31,7 +31,7 @@ train_loader:
     hf_name: HuggingFaceH4/ultrafeedback_binarized
     split: train_prefs
     max_seq_len: ${max_seq_len}
-    num_samples: 256
+    num_samples: all
     shuffle: true
     max_prompt_length: 512
   drop_last: true
@@ -64,7 +64,7 @@ algorithms:
 max_duration: 1ep
 eval_interval: 1
 eval_first: False
-global_train_batch_size: 128
+global_train_batch_size: 32
 
 # System
 seed: ${global_seed}
@@ -87,8 +87,8 @@ fsdp_config:
 
 # Logging
 progress_bar: true
-log_to_console: true
-console_log_interval: 1ba
+# log_to_console: true
+# console_log_interval: 1ba
 
 callbacks:
   speed_monitor:
@@ -102,6 +102,16 @@ loggers:
     "project": "zephyr-training",
     "entity": "rshaw"
   }
+
+profiler:
+  schedule:
+    skip_first: 1
+    wait: 1
+    warmup: 1
+    active: 4
+    repeat: 1
+  json_trace_handler:
+    folder: /data/runs/{run_name}/traces
 
 save_interval: 100ba
 save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
