@@ -1,6 +1,6 @@
 from dataloaders.dpo_dataloader import build_dpo_dataloader
 from utils.sparsity import attach_masks, MaskPrunedWeights
-from utils.drop import ComposerHFCausalLMWithDPO, DPO
+from utils.dpo import ComposerHFCausalLMWithDPO, DPO
 
 import copy
 import gc
@@ -9,7 +9,7 @@ import os
 import sys
 import time
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 import torch
 from composer import Trainer
@@ -584,14 +584,15 @@ def main(cfg: DictConfig) -> Trainer:
 
 ################################################################################################################################################################
             model = build_composer_model(model_config, tokenizer)
-            ref_model = build_composer_model(ref_model_config, tokenizer)
+            ref_model = build_composer_model(ref_model_config, tokenizer).eval()
+
             model = model.to(dtype=torch.bfloat16)
             ref_model = ref_model.to(dtype=torch.bfloat16)
     
     if algorithms is None:
-        algorithms = [DPO(ref_model,tokenizer)]
+        algorithms = [DPO(ref_model)]
     else:
-        algorithms.append(DPO(ref_model,tokenizer))
+        algorithms.append(DPO(ref_model))
     
     # if sparse finetuning apply sparsity mask
     if sparse_finetuning:

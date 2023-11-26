@@ -1,5 +1,6 @@
-import re
+import re, random
 
+from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizerBase
 from trl.trainer.utils import DPODataCollatorWithPadding
 import datasets as hf_datasets
@@ -46,12 +47,11 @@ def build_from_hf(
     dataset_name = cfg.hf_name
     split = cfg.split.replace('-', '_')
     dataset = hf_datasets.load_dataset(dataset_name, split=split)
-    truncation_side = cfg.truncation_side
 
     if cfg.num_samples != "all":
         dataset = dataset.shuffle().select(range(cfg.num_samples))
     
-    tokenizer.truncation_side = truncation_side
+    tokenizer.truncation_side = "left"
 
     dataset = dataset.map(
         apply_chat_template, 
@@ -60,12 +60,17 @@ def build_from_hf(
         desc="Formatting comparisons with prompt template",
     )
     
-    for index in random.sample(range(len(dataset)), 2):
+    for index in random.sample(range(len(dataset)), 1):
+        print(f"\n\n--------------------------------------------------------------------------------------------------------")
+        print(f"PROMPT:")
+        print(f"{dataset[index]['text_prompt']}")
         print(f"--------------------------------------------------------------------------------------------------------")
-        print(f"Sample {index} of the processed training set:\n")
+        print(f"CHOSEN:")
         print(f"{dataset[index]['text_chosen']}\n")
-        print(f"{dataset[index]['text_rejected']}")
         print(f"--------------------------------------------------------------------------------------------------------")
+        print(f"REJECTED:")
+        print(f"{dataset[index]['text_rejected']}")
+        print(f"--------------------------------------------------------------------------------------------------------\n\n")
 
     # build packed dataset (note: tokenized here)
     return dataset.rename_columns({
@@ -93,7 +98,7 @@ def build_dpo_dataloader(
     data_collator = DPODataCollatorWithPadding(
         tokenizer,
         max_length=cfg.dataset.max_seq_len,
-        max_prompt_length=cfg.dataset.max_prompt_legnth,
+        max_prompt_length=cfg.dataset.max_prompt_length,
         label_pad_token_id=-100,
         padding_value=0,
         truncation_mode="keep_end",
@@ -104,16 +109,17 @@ def build_dpo_dataloader(
         dataset,
         collate_fn=data_collator,
         batch_size=device_batch_size,
-        # drop_last=cfg.drop_last,
-        # sampler=dist.get_sampler(dataset, drop_last=cfg.drop_last, shuffle=cfg.dataset.shuffle),
-        # num_workers=cfg.num_workers,
-        # pin_memory=cfg.get('pin_memory', True),
-        # prefetch_factor=cfg.get('prefetch_factor', 2),
-        # persistent_workers=cfg.get('persistent_workers', True),
+        drop_last=cfg.drop_last,
+        sampler=dist.get_sampler(dataset, drop_last=cfg.drop_last, shuffle=cfg.dataset.shuffle),
+        num_workers=cfg.num_workers,
+        pin_memory=cfg.get('pin_memory', True),
+        prefetch_factor=cfg.get('prefetch_factor', 2),
+        persistent_workers=cfg.get('persistent_workers', True),
         timeout=cfg.get('timeout', 0),
     )
 
-    token_counting_func = get_tokens_per_batch_func(
-        pad_token_id=tokenizer.pad_token_id)
-
-    return DataSpec(dataloader=dl, get_num_tokens_in_batch=token_counting_func)
+    # token_counting_func = get_tokens_per_batch_func(
+    #     pad_token_id=tokenizer.pad_token_id)
+    # 
+    # return DataSpec(dataloader=dl, get_num_tokens_in_batch=token_counting_func)
+    return DataSpec(dataloader=dl)

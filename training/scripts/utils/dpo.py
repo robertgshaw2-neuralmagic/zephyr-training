@@ -1,7 +1,7 @@
 """Implements a HF DPO Model wrapped in :class:`.ComposerModel`."""
 
-import logging, os, warnings
-from typing import Mapping, Union, Union, Dict, Optional
+import logging, os, warnings, random
+from typing import Mapping, Union, Union, Dict, Optional, Tuple, List
 
 import torch
 import torch.nn.functional as F
@@ -12,7 +12,8 @@ from trl.trainer.utils import pad_to_length
 from omegaconf import DictConfig
 from composer.core import Event, Algorithm
 from composer.models.huggingface import HuggingFaceModel
-from composer.utils import dist
+from composer.trainer.dist_strategy import prepare_fsdp_module
+from composer.utils import dist, get_device
 
 from llmfoundry.models.hf.hf_fsdp import hf_get_init_device, prepare_hf_model_for_fsdp
 from llmfoundry.models.layers.attention import is_flash_v2_installed
@@ -29,6 +30,7 @@ class DPO(Algorithm):
         self.ref_model = ref_model
         self.beta = beta
         self.first_time = True
+        self.loss_type = _LOSS_TYPE
     
     def match(self, event, state):
         """
@@ -60,7 +62,7 @@ class DPO(Algorithm):
                     ref_rejected_logps, 
                     _, 
                     _
-                ) = concatenated_forward(self.ref_model, state.batch)
+                ) = self.ref_model(state.batch)
             
             # sft model forward (from forward pass)
             (
@@ -74,8 +76,8 @@ class DPO(Algorithm):
             losses, chosen_rewards, rejected_rewards = self.dpo_loss(
                 policy_chosen_logps,
                 policy_rejected_logps,
-                reference_chosen_logps,
-                reference_rejected_logps,
+                ref_chosen_logps,
+                ref_rejected_logps,
             )
 
             loss = losses.mean()
@@ -90,8 +92,7 @@ class DPO(Algorithm):
             metrics[f"dpo/logps/chosen"] = policy_chosen_logps.detach().cpu().mean()
             metrics[f"dpo/logits/rejected"] = policy_rejected_logits.detach().cpu().mean()
             metrics[f"dpo/logits/chosen"] = policy_chosen_logits.detach().cpu().mean()
-            metrics[f"dpo/losses"] = lo
-            logger.log_metrics(loss)
+            logger.log_metrics(metrics)
 
             state.loss += loss
     
@@ -138,7 +139,6 @@ class DPO(Algorithm):
 class HuggingFaceModelWithDPO(HuggingFaceModel):
     def __init__(self,
                  model: PreTrainedModel,
-                 ref_model: PreTrainedModel,
                  tokenizer: Optional[PreTrainedTokenizerBase] = None,
                  shift_labels: bool = False,
                  init_device: Optional[str] = None,
@@ -148,7 +148,6 @@ class HuggingFaceModelWithDPO(HuggingFaceModel):
                          use_logits=True,
                          shift_labels=shift_labels)
 
-        self.ref_model = ref_model
         self.loss_type = _LOSS_TYPE
         self.beta = beta
 
@@ -156,12 +155,17 @@ class HuggingFaceModelWithDPO(HuggingFaceModel):
         # so that the (possible) embedding resizing doesn't destroy them
         prepare_hf_model_for_fsdp(self.model, init_device)
 
+        # support for meta initialization
+        self.model.param_init_fn = lambda module: self.model._init_weights(
+            module)
+
     # override forward to use call dpo related function
     def forward(self, batch: Mapping):
         if isinstance(batch, dict) or isinstance(batch, UserDict):
-            output = concatenated_forward(self.model, batch)
+            output = self.concatenated_forward(batch)
         else:
             raise ValueError('Unexpected batch type')
+        return output
 
     def loss(self, outputs, batch):
         # loss calculated in the Algorithm in Event.AFTER_LOSS
@@ -263,7 +267,6 @@ class ComposerHFCausalLMWithDPO(HuggingFaceModelWithDPO):
         om_model_config (DictConfig: either an omegaconf dictionary used to configure the mode
         if DictConfig, the following keys are required:
             cfg.pretrained_model_name_or_path (str)
-            cfg.ref_model_name_or_path
             cfg.beta
         tokenizer (PreTrainedTokenizer): The tokenizer that the model will use.
     """
@@ -290,12 +293,6 @@ class ComposerHFCausalLMWithDPO(HuggingFaceModelWithDPO):
                 use_auth_token=use_auth_token,
             )
 
-            ref_config = AutoConfig.from_pretrained(
-                om_model_config.ref_model_name_or_path,
-                trust_remote_code=trust_remote_code,
-                use_auth_token=use_auth_token,
-            )
-
             # This is not how you are supposed to set this, but transformers currently only
             # supports enabling flash attention 2 when using the from_pretrained API.
             # We need to support it for both from_pretrained and from_config, so we have to
@@ -304,7 +301,6 @@ class ComposerHFCausalLMWithDPO(HuggingFaceModelWithDPO):
             # whether it is installed above, and whether the chosen config supports it here.
             # https://github.com/huggingface/transformers/issues/26878
             config._flash_attn_2_enabled = use_flash_attention_2
-            ref_config._flash_attn_2_enabled = use_flash_attention_2
 
             # If the HuggingFace model is coming from a local folder, Hugging Face copies the modules into the
             # transformers modules cache. On particular systems, this operation seems to cause contention between
@@ -352,7 +348,6 @@ class ComposerHFCausalLMWithDPO(HuggingFaceModelWithDPO):
             )
 
         composer_model = super().__init__(model=model,
-                                          ref_model=ref_model,
                                           shift_labels=True,
                                           tokenizer=tokenizer,
                                           beta=beta,
